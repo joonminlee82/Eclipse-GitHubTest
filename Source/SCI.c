@@ -57,7 +57,7 @@
 //#pragma CODE_SECTION(Main_To_INV_Msg_Pkt, "ramfuncs");
 
 /* DSP VERSION INFORMATION */
-char *DspVerStr	= "FAHD20052001";
+char *DspVerStr	= "FAHD20052002";
 //extern FLOOR 		Floor ;
 extern Flt 			    FLT;
 //extern Rmb			RMB;
