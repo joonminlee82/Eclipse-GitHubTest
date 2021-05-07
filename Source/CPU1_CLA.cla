@@ -1,0 +1,203 @@
+/*****************************************************************************
+-------------------------------Organization------------------------------------	
+	Project				: Hybrid Variable Speed System 
+	Compiler    	: TMS320F28377D C-Compiler v6.1
+	Author				: Inverter part, E/C Department in Hyudai elevator
+	Version				: v1.0
+	Last Rev.			: 2015.8.28
+******************************************************************************/
+#include "F28x_Project.h"
+#include "CPU1_CLA_Shared.h"
+#include "Variable.h"
+#include "CLAmath.h"
+#include "comp.h"
+//#include "FC.h"
+
+#pragma DATA_SECTION(cla1_cnt, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(cla2_cnt, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(cla_Init_cnt, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(Offset_ADC_INV1_Ibs, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(Offset_ADC_INV1_Ics, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(Offset_ADC_INV1_Ias, "Cla1ToCpuMsgRAM")
+#pragma DATA_SECTION(Offset_ADC_ESS_Iqe, "Cla1ToCpuMsgRAM")
+Uint16 cla1_cnt, cla2_cnt, cla3_cnt, cla4_cnt, cla5_cnt, cla6_cnt, cla7_cnt;
+Uint16 cla_Init_cnt, Test_cla;
+float Offset_ADC_INV1_Ibs, Offset_ADC_INV1_Ics, Offset_ADC_INV1_Ias,Offset_ADC_ESS_Iqe;
+unsigned long uOffset_ADC_INV1_Ibs, uOffset_ADC_INV1_Ics, uOffset_ADC_INV1_Ias,uOffset_ADC_ESS_Iqe;
+
+#pragma CODE_SECTION(cla_ISR1,"Cla1Prog");
+__interrupt void cla_ISR1(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	
+	cla1_cnt++;
+	if(cla1_cnt > 20000) cla1_cnt = 0;
+}
+
+#pragma CODE_SECTION(cla_ISR2,"Cla1Prog");
+__interrupt void cla_ISR2(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	
+	cla2_cnt++;
+	if(cla2_cnt > 20000) cla2_cnt = 0;
+	if(Flag_offset != 2){
+		//forced SW ADC SOC -------------------------------------------
+		AdcaRegs.ADCSOCFRC1.all = 0x007; //SOC0, SOC1, SOC2 forced start
+		AdcbRegs.ADCSOCFRC1.all = 0x007; //SOC0, SOC1, SOC2 forced start
+		AdccRegs.ADCSOCFRC1.all = 0x007; //SOC0, SOC1, SOC2 forced start
+		AdcdRegs.ADCSOCFRC1.all = 0x007; //SOC0, SOC1, SOC2 forced start
+		//forced SW ADC SOC ---------------------12 cycle-------------
+			
+		if(nPFO_15V == 1){
+			while( (AdcaRegs.ADCINTFLG.bit.ADCINT2 & AdcbRegs.ADCINTFLG.bit.ADCINT2 & AdccRegs.ADCINTFLG.bit.ADCINT2 & AdcdRegs.ADCINTFLG.bit.ADCINT2)==0){;} //31cycle
+			AdcaRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
+			AdcbRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
+			AdccRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
+			AdcdRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;
+			if((Flag_offset == 0)&&(offsetLoopCnt >= 10000)){
+				Flag_offset = 1;
+				uOffset_ADC_INV1_Ibs = 0;
+				uOffset_ADC_INV1_Ics = 0;  
+				uOffset_ADC_INV1_Ias = 0;  
+				uOffset_ADC_ESS_Iqe = 0;
+				Offset_ADC_INV1_Ibs = 0.;
+				Offset_ADC_INV1_Ias = 0.;
+				Offset_ADC_INV1_Ibs = 0.;
+				Offset_ADC_ESS_Iqe = 0.;
+				offsetLoopCnt = 0;
+			}
+			if(Flag_offset == 1){ 
+				uOffset_ADC_INV1_Ias += (AdcaResultRegs.ADCRESULT1); //INV1.Ias 
+				uOffset_ADC_INV1_Ibs += (AdcbResultRegs.ADCRESULT1); //INV1.Ibs  
+				uOffset_ADC_INV1_Ics += (AdccResultRegs.ADCRESULT1); //INV1.Ics 
+				//uOffset_ADC_ESS_Iqe += (AdcdResultRegs.ADCRESULT1);  //INV3.Iqse
+			}
+			
+			if((Flag_offset == 1)&&(offsetLoopCnt > offsetMaxCnt)){
+				Offset_ADC_INV1_Ias = (float)(uOffset_ADC_INV1_Ias*ScaleAin_SOC1[0]/offsetMaxCnt);
+				Offset_ADC_INV1_Ias -= OffsetAin_SOC1[0];
+				Offset_ADC_INV1_Ibs = (float)(uOffset_ADC_INV1_Ibs*ScaleAin_SOC1[1]/offsetMaxCnt);
+				Offset_ADC_INV1_Ibs -= OffsetAin_SOC1[1];
+				Offset_ADC_INV1_Ics = (float)(uOffset_ADC_INV1_Ics*ScaleAin_SOC1[2]/offsetMaxCnt);
+				Offset_ADC_INV1_Ics -= OffsetAin_SOC1[2];
+				//Offset_ADC_ESS_Iqe = (float)(uOffset_ADC_ESS_Iqe*ScaleAin_SOC1[3]/offsetMaxCnt);
+				//Offset_ADC_ESS_Iqe -= OffsetAin_SOC1[3];
+				uOffset_ADC_INV1_Ibs = 0;
+				uOffset_ADC_INV1_Ics = 0;  
+				uOffset_ADC_INV1_Ias = 0;  
+				uOffset_ADC_ESS_Iqe = 0;
+				Flag_offset = 2;
+				offsetLoopCnt = 0;
+				if((fabs(Offset_ADC_INV1_Ibs) < 0.01)||(fabs(Offset_ADC_INV1_Ibs) > 2.0)) Offset_ADC_INV1_Ibs = 0.;//this is arithmetic error of float variable 
+				if((fabs(Offset_ADC_INV1_Ics) < 0.01)||(fabs(Offset_ADC_INV1_Ics) > 2.0)) Offset_ADC_INV1_Ics = 0.;
+				if((fabs(Offset_ADC_INV1_Ias) < 0.01)||(fabs(Offset_ADC_INV1_Ias) > 2.0)) Offset_ADC_INV1_Ias = 0.;
+				if((fabs(Offset_ADC_ESS_Iqe) < 0.01)||(fabs(Offset_ADC_ESS_Iqe) > 2.0)) Offset_ADC_ESS_Iqe = 0.;
+			}
+		}
+		else{
+			uOffset_ADC_INV1_Ibs = 0;
+			uOffset_ADC_INV1_Ics = 0;  
+			uOffset_ADC_INV1_Ias = 0;  
+			uOffset_ADC_ESS_Iqe = 0;
+			Offset_ADC_INV1_Ibs = 0.;
+			Offset_ADC_INV1_Ias = 0.;
+			Offset_ADC_INV1_Ibs = 0.;
+			Offset_ADC_ESS_Iqe = 0.;
+		}
+		// Offset value calculation
+		offsetLoopCnt++;
+	}	
+}
+#pragma CODE_SECTION(cla_ISR3,"Cla1Prog");
+__interrupt void cla_ISR3(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	cla3_cnt++;
+	if(cla3_cnt > 20000) cla3_cnt = 0;
+}
+#pragma CODE_SECTION(cla_ISR4,"Cla1Prog");
+__interrupt void cla_ISR4(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	cla4_cnt++;
+	if(cla4_cnt > 20000) cla4_cnt = 0;
+}
+#pragma CODE_SECTION(cla_ISR5,"Cla1Prog");
+__interrupt void cla_ISR5(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	cla5_cnt++;
+	if(cla5_cnt > 20000) cla5_cnt = 0;
+}
+#pragma CODE_SECTION(cla_ISR6,"Cla1Prog");
+__interrupt void cla_ISR6(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	cla6_cnt++;
+	if(cla6_cnt > 20000) cla6_cnt = 0;
+}
+#pragma CODE_SECTION(cla_ISR7,"Cla1Prog");
+__interrupt void cla_ISR7(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	//Uint16 i;
+	
+	cla7_cnt++;
+	if(cla7_cnt > 20000) cla7_cnt = 0;
+#if 0		
+	for(i=0;i<8;i++){  
+		da_value[i] = (((long)((da_cla[i] - da_mid[i])*da_scale[i]) + 0x800) & 0x0FFF);      // digital value equivalent to a
+	}
+	
+//DA5------------------------------------------------------------------------------------------------
+	da_value[4] = ~(0x0000 | da_value[4]);
+	SpicRegs.SPITXBUF = da_value[4];
+//DA6------------------------------------------------------------------------------------------------
+	da_value[5] = ~(0x4000 | da_value[5]);
+	SpicRegs.SPITXBUF = da_value[5];
+//DA7------------------------------------------------------------------------------------------------
+	da_value[6] = ~(0x8000 | da_value[6]);
+	SpicRegs.SPITXBUF = da_value[6];
+//DA8------------------------------------------------------------------------------------------------
+	da_value[7] = ~(0xc000 | da_value[7]);
+	SpicRegs.SPITXBUF = da_value[7];
+#endif
+}
+__interrupt void cla_Init(void)
+{
+	#if (CLA_DEBUG)
+	__mdebugstop();
+	#endif
+	cla_Init_cnt++;
+	Offset_ADC_INV1_Ibs = 0.;
+	Offset_ADC_INV1_Ics = 0.; 
+	Offset_ADC_INV1_Ias = 0.;
+	Offset_ADC_ESS_Iqe = 0.;
+	uOffset_ADC_INV1_Ibs = 0;
+	uOffset_ADC_INV1_Ics = 0; 
+	uOffset_ADC_INV1_Ias = 0;
+	uOffset_ADC_ESS_Iqe = 0;
+	Test_cla = 0;
+	cla1_cnt = 0;
+	cla2_cnt = 0;
+	cla3_cnt = 0;
+	cla4_cnt = 0;
+	cla5_cnt = 0;
+	cla6_cnt = 0;
+	cla7_cnt = 0;
+}	

@@ -1,0 +1,100 @@
+void Id43_Data_Parsing(u8 *pData)
+{
+	u8 i = 0;
+	u8 j;
+
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8MaxSpeed[j] = pData[24+i++];				// Max Speed: Integer(4), Decimal(2)
+		if(j == 5) INV1_PROFILE.SpeedMax = INV1.MaxSpeed = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8MaxSpeed[j-5], 4, 2);
+	}
+	KEY_SetControlCode(MAX_RPM, INV1.MaxSpeed);
+	FRAM_Write(KEY_CONTROL_START+MAX_RPM, INV1.MaxSpeed);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8MaxAcc[j] = pData[24+i++];				// Max Accelation: Integer(4), Decimal(2)
+		if(j == 5) INV1_PROFILE.AccMax = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8MaxAcc[j-5], 4, 2);
+	}
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8MaxJerk[j] = pData[24+i++];				// Max Jerk: Integer(4), Decimal(2)
+		if(j == 5) INV1_PROFILE.JerkMax = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8MaxJerk[j-5], 4, 2);
+	}
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8Jm[j] = pData[24+i++];					// Inertia: Integer(4), Decimal(2)
+		if(j == 5) INV1.Jm = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8Jm[j-5], 4, 2);
+	}
+	KEY_SetControlCode(SC_JM, INV1.Jm);
+	FRAM_Write(KEY_CONTROL_START+SC_JM, INV1.Jm);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8SCFFGain[j] = pData[24+i++];				// Speed Controller FeedForward Gain: Integer(4), Decimal(2)
+		if(j == 5) INV1_SC.SCFF_Gain = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8SCFFGain[j-5], 4, 2);
+	}
+	KEY_SetControlCode(SC_FF_GAIN, INV1_SC.SCFF_Gain);
+	FRAM_Write(KEY_CONTROL_START+SC_FF_GAIN, INV1_SC.SCFF_Gain);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8TorqueLimit[j] = pData[24+i++];			// Torque Limit: Integer(4), Decimal(2)
+		if(j == 5) INV1.Te_Limit = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8TorqueLimit[j-5], 4, 2);
+	}
+	KEY_SetFactoryCode(TORQUE_LIMIT, INV1.Te_Limit);
+	FRAM_Write(KEY_FACTORY_START+TORQUE_LIMIT, INV1.Te_Limit);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8ScaleVdc[j] = pData[24+i++];				// DC-Link Voltage Scale Factor: Integer(2), Decimal(4)
+		if(j == 5) ScaleADin_Vdc_30kVA = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8ScaleVdc[j-5], 2, 4)*0.001;
+	}
+	KEY_SetFactoryCode(SCALE_VDC, ScaleADin_Vdc_30kVA*1000);
+	FRAM_Write(KEY_FACTORY_START+SCALE_VDC, ScaleADin_Vdc_30kVA*1000);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8ScaleCurrent[j] = pData[24+i++];			// Current Scale Factor: Integer(2), Decimal(4)
+		if(j == 5) ScaleADin_Iac_30kVA = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8ScaleCurrent[j-5], 2, 4)*0.001;
+	}
+	KEY_SetFactoryCode(SCALE_IS, ScaleADin_Iac_30kVA*1000);
+	FRAM_Write(KEY_FACTORY_START+SCALE_IS, ScaleADin_Iac_30kVA*1000);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8Wcc[j] = pData[24+i++];					// Current Controller Bandwidth: Integer(4), Decimal(2)
+		if(j == 5) Wcc = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8Wcc[j-5], 4, 2);
+	}
+	KEY_SetFactoryCode(INV_WCC, Wcc);
+	FRAM_Write(KEY_FACTORY_START+INV_WCC, Wcc);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8Wsc[j] = pData[24+i++];					// Speed Controller Bandwidth: Integer(4), Decimal(2)
+		if(j == 5) Wsc = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8Wsc[j-5], 4, 2);
+	}
+	KEY_SetFactoryCode(WSC1, Wsc);
+	FRAM_Write(KEY_FACTORY_START+WSC1, Wsc);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8Wpc[j] = pData[24+i++];					// Position Controller Bandwidth: Integer(4), Decimal(2)
+		if(j == 5) Wpc = TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8Wpc[j-5], 4, 2);
+	}
+	KEY_SetFactoryCode(WPC, Wpc);
+	FRAM_Write(KEY_FACTORY_START+WPC, Wpc);
+	for(j = 0; j < 6; j++)
+	{
+		g_Id43Data.u8RxData.u8OverCurrent[j] = pData[24+i++];			// Over Current Setting: Integer(4), Decimal(2)
+		if(j == 5) OC_Set_I =  TypeCast_u8tofloat(&g_Id43Data.u8RxData.u8OverCurrent[j-5], 4, 2);
+	}
+	KEY_SetFactoryCode(INV_OC_SET, OC_Set_I);
+	FRAM_Write(KEY_FACTORY_START+INV_OC_SET, OC_Set_I);
+
+	FWD_Dir = g_Id43Data.u8RxData.u8FwdDirection = pData[24+i++];		// Forward Direction
+	KEY_SetControlCode(FWD_DIRECTION, FWD_Dir);
+	FRAM_Write(KEY_CONTROL_START+FWD_DIRECTION, FWD_Dir);
+
+	EncType = g_Id43Data.u8RxData.u8EncoderType = pData[24+i++];		// Encoder Type
+	KEY_SetFactoryCode(ENCODERTYPE, EncType);
+	FRAM_Write(KEY_FACTORY_START+ENCODERTYPE, EncType);
+
+	for(j = 0; j < 12; j++)
+	{
+		g_Id43Data.u8RxData.u8Reserved[j] = pData[24+i++];				// Reserved Data
+	}
+
+}
